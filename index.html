@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Expense Tracker — Donut Chart + Monthly Estimate</title>
+
+  <!-- Chart.js (used for donut chart) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg-dark:#071427;
+      --muted:#94a3b8;
+      --accent:#6366f1;
+      --accent2:#06b6d4;
+      --radius:10px;
+      color-scheme: dark;
+    }
+
+    /* remove all animations/transitions globally */
+    *{transition:none!important;animation:none!important}
+
+    html,body{
+      height:100%;
+      margin:0;
+      background:linear-gradient(180deg,var(--bg-dark) 0%, #031026 100%);
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      color:#e6eef8
+    }
+    .wrap{max-width:1200px;margin:18px auto;padding:14px}
+
+    header{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:12px
+    }
+    .brand{
+      display:flex;
+      gap:10px;
+      align-items:center
+    }
+
+    .logo{
+      width:48px;
+      height:48px;
+      border-radius:8px;
+      overflow:hidden;
+      background:#020617;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .logo img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+    }
+
+    .title h1{margin:0;font-size:16px}
+    .title p{margin:0;font-size:12px;color:var(--muted)}
+
+    .controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .control {
+      display:flex;align-items:center;background:#071527;border-radius:8px;
+      padding:8px 10px;gap:8px;border:1px solid rgba(255,255,255,0.03);
+    }
+    .control input, .control select{
+      background:transparent;border:none;outline:none;color:#e6eef8; min-width:120px
+    }
+    .control input::placeholder{ color: var(--muted) }
+
+    .btn {
+      background: linear-gradient(90deg,var(--accent),var(--accent2));
+      border:none;
+      color:white;
+      padding:8px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:600;
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+    }
+    .btn.ghost {
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.06);
+      color:var(--muted);
+      font-weight:600
+    }
+    .btn.small{ padding:6px 8px; font-size:13px }
+
+    .card{
+      background:#071827;
+      padding:12px;
+      border-radius:var(--radius);
+      margin-bottom:12px;
+      border:1px solid rgba(255,255,255,0.03)
+    }
+    .card h3{margin:0 0 8px 0;font-weight:600}
+
+    .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .field{display:flex;flex-direction:column}
+    .field label{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .input{
+      display:flex;align-items:center;gap:8px;
+      padding:8px;border-radius:8px;
+      background:transparent;border:1px solid rgba(255,255,255,0.03);
+    }
+    .input input, .input select{
+      background:transparent;border:none;outline:none;color:#e6eef8;width:100%
+    }
+
+    .row-end{display:flex;justify-content:flex-end;gap:8px;grid-column:1/-1}
+
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px}
+    thead th{
+      background:transparent;color:#cfe6ff;padding:10px;
+      border-bottom:1px solid rgba(255,255,255,0.03);
+      text-align:left;font-weight:600
+    }
+    tbody tr{background:transparent}
+    td{
+      padding:10px;
+      border-bottom:1px dashed rgba(255,255,255,0.02);
+      color:#d8e9ff
+    }
+    .muted{color:var(--muted);font-size:13px}
+
+    .icon-btn{
+      background:transparent;
+      border:none;
+      color:var(--muted);
+      cursor:pointer;
+      padding:6px;
+      border-radius:6px
+    }
+
+    .footer{
+      display:flex;flex-wrap:wrap;gap:8px;
+      justify-content:space-between;align-items:center;
+      margin-top:10px;color:var(--muted)
+    }
+
+    .overlay{
+      position:fixed;inset:0;background:rgba(2,6,23,0.8);
+      display:flex;align-items:center;justify-content:center;
+      padding:12px;z-index:60
+    }
+    .modal{
+      width:100%;max-width:860px;border-radius:12px;
+      padding:12px;background:#071827;
+      border:1px solid rgba(255,255,255,0.03)
+    }
+
+    .snackbar{
+      position:fixed;right:20px;bottom:20px;
+      background:#072033;color:#dff8ff;
+      padding:10px 12px;border-radius:8px;
+      display:flex;gap:12px;align-items:center;z-index:999
+    }
+    .snackbar button{
+      background:transparent;border:none;
+      color:#bfe9ff;font-weight:700;cursor:pointer
+    }
+
+    @media (max-width:900px){
+      .form-grid{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width:560px){
+      .form-grid{grid-template-columns:1fr}
+      .controls{flex-direction:column;align-items:stretch}
+    }
+
+    .donut-wrap{max-width:540px;margin:0 auto}
+    #donutChart { width:100%; height:320px; display:block; }
+
+    /* NEW: warning banner for estimate crossed (fixed: starts hidden) */
+    .warning-banner{
+      position:fixed;
+      top:15px;
+      left:50%;
+      transform:translateX(-50%);
+      background:#7f1d1d;
+      border:1px solid #fecaca;
+      color:#fee2e2;
+      padding:12px 14px;
+      border-radius:10px;
+      max-width:420px;
+      width:calc(100% - 30px);
+      font-size:14px;
+      font-weight:500;
+      display:none;
+      z-index:9999;
+      box-sizing:border-box;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .warning-banner strong{
+      color:#fff;
+      font-size:15px;
+      font-weight:700;
+    }
+    .warning-banner button{
+      margin-left:auto;
+      background:transparent;
+      border:none;
+      color:#ffdada;
+      font-size:16px;
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- pretty warning banner (hidden by default) -->
+  <div id="estimateWarning" class="warning-banner"></div>
+
+  <div class="wrap">
+
+    <header>
+      <div class="brand">
+        <div class="logo">
+          <img src="logo.png" alt="App Logo">
+        </div>
+
+        <div class="title">
+          <h1>Expense Tracker</h1>
+          <p>IndexedDB • CSV import/export • Donut chart</p>
+        </div>
+      </div>
+
+      <div class="controls" role="group" aria-label="controls">
+        <div class="control" title="Search">
+          <input id="filterText" placeholder="Search description or category..." />
+        </div>
+        <div class="control"><input id="fromDate" type="date" /></div>
+        <div class="control"><input id="toDate" type="date" /></div>
+        <div class="control">
+          <select id="categoryFilter"><option value="">All categories</option></select>
+        </div>
+
+        <!-- Monthly estimate input -->
+        <div class="control">
+          <input id="monthlyEstimate" type="number" min="0" placeholder="This month estimate (₹)" />
+        </div>
+
+        <button class="btn ghost" id="loadSample">Sample</button>
+        <button class="btn" id="exportCsv">Export</button>
+        <label style="margin-left:6px">
+          <input id="csvFileInput" type="file" accept=".csv" style="display:none" />
+          <button class="btn ghost" id="chooseCsvBtn">Import CSV</button>
+        </label>
+        <button class="btn" id="openMonthlyReport">Monthly</button>
+        <button class="btn ghost" onclick="location.href='reports.html'">Reports</button>
+      </div>
+    </header>
+
+    <!-- Add / Edit -->
+    <section class="card">
+      <h3>Add / Edit Expense</h3>
+      <form id="expenseForm" class="form-grid" autocomplete="off">
+        <input type="hidden" id="expenseId" />
+        <div class="field">
+          <label>Description</label>
+          <div class="input"><input id="desc" type="text" placeholder="Lunch at cafe" required /></div>
+        </div>
+        <div class="field">
+          <label>Amount (₹)</label>
+          <div class="input"><input id="amount" type="number" step="0.01" min="0.01" placeholder="0.00" required /></div>
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <div class="input"><input id="category" type="text" placeholder="Food, Travel" /></div>
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <div class="input"><input id="date" type="date" /></div>
+        </div>
+        <div class="row-end">
+          <button type="reset" class="btn ghost">Clear</button>
+          <button type="submit" class="btn" id="saveBtn">Save</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Table -->
+    <section class="card">
+      <h3>Expenses</h3>
+      <div style="overflow:auto">
+        <table id="expTable" aria-live="polite">
+          <thead>
+            <tr>
+              <th>ID</th><th>Date</th><th>Description</th>
+              <th>Category</th><th>Amount</th><th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="expTbody">
+            <tr><td colspan="6" class="muted">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="footer">
+        <div class="muted" id="summary">0 expenses • Total ₹0.00</div>
+        <div class="muted">DB: <strong>expenses-db</strong></div>
+      </div>
+    </section>
+
+    <!-- Donut Chart -->
+    <section class="card">
+      <h3>Spending Distribution (Donut)</h3>
+      <div class="donut-wrap">
+        <canvas id="donutChart"></canvas>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Monthly modal -->
+  <div id="monthlyModal" style="display:none">
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="margin:0">Monthly Report</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost" id="closeMonthly">Close</button>
+            <button class="btn" id="exportMonthlyCsv">Export CSV</button>
+          </div>
+        </div>
+        <div style="overflow:auto">
+          <table id="monthlyTable" style="width:100%">
+            <thead>
+              <tr><th>Month</th><th>Total (₹)</th><th>Transactions</th></tr>
+            </thead>
+            <tbody id="monthlyTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="snackbarContainer" style="position:fixed;right:20px;bottom:20px;z-index:9999"></div>
+
+  <!-- JS PART KEPT EXACTLY SAME AS YOUR LAST MESSAGE -->
+  <!-- (I didn't change any JS, only removed the Uploaded block) -->
+  <!-- paste your existing <script> ... </script> code here unchanged -->
+
+</body>
+</html>
